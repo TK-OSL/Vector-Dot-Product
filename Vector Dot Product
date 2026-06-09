@@ -1,0 +1,828 @@
+<!--
+=======================================================================
+โปรเจกต์: Interactive Vector Dot Product (การคูณเวกเตอร์แบบดอต 2D และ 3D)
+รายละเอียด: 
+    เว็บแอปพลิเคชันสำหรับเป็นสื่อการสอนคณิตศาสตร์และฟิสิกส์ เรื่องการคูณเวกเตอร์แบบดอต (Scalar Product)
+    ผู้เรียนสามารถปรับค่าเวกเตอร์ A และ B ได้แบบเรียลไทม์ พร้อมดูการแสดงผลทั้งในรูปแบบกราฟ 2 มิติ, 3 มิติ 
+    และวิธีการคำนวณแบบ Step-by-step ในรูปแบบสมการเมทริกซ์
+
+เทคโนโลยีหลักที่ใช้ (Libraries & Frameworks):
+    1. HTML5 / CSS3: โครงสร้างหลักของหน้าเว็บ
+    2. Tailwind CSS (CDN): สำหรับการออกแบบ UI และจัด Layout ให้รองรับทุกขนาดหน้าจอ (Responsive)
+    3. MathJax 3 (CDN): สำหรับเรนเดอร์สมการคณิตศาสตร์และเมทริกซ์ให้สวยงามระดับงานพิมพ์
+    4. HTML Canvas API: สำหรับวาดกราฟิกและลูกศรในระนาบ 2 มิติ แบบเบาบางและรวดเร็ว
+    5. Three.js (CDN): โฟร์มเวิร์กหลักสำหรับสร้างพื้นที่ กราฟิก และการหมุนมุมกล้องในแบบ 3 มิติ
+
+ผู้เขียน/ผู้สร้าง: โค้ดต้นฉบับสร้างโดย Gemini (AI) สนับสนุนโดย OpenSimLab.org
+=======================================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Vector Dot Product</title>
+    
+    <!-- นำเข้า Tailwind CSS สำหรับจัดการสไตล์และเลย์เอาต์ -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- นำเข้า MathJax สำหรับแสดงผลสมการคณิตศาสตร์ (ใช้เวอร์ชันที่ไม่ต้องพึ่งพา polyfill) -->
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <!-- นำเข้า Three.js สำหรับสร้างภาพจำลอง 3 มิติ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <style>
+        /* สไตล์พื้นฐานของเว็บไซต์ */
+        body {
+            font-family: 'Sarabun', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f3f4f6; /* สีเทาอ่อน */
+            color: #1f2937;
+        }
+        /* ฟอนต์สำหรับข้อความคณิตศาสตร์ */
+        .math-text {
+            font-family: 'Times New Roman', Times, serif;
+        }
+        canvas {
+            display: block;
+        }
+        /* ซ่อนปุ่มลูกศรขึ้น/ลง (Spinner) ในช่องกรอกตัวเลข HTML */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+        
+        /* สไตล์สำหรับปุ่มสลับภาษา (Toggle Switch) */
+        .lang-switch {
+            position: relative;
+            display: inline-block;
+            width: 80px;
+            height: 34px;
+        }
+        .lang-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #e5e7eb;
+            transition: .4s;
+            border-radius: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 10px;
+            font-weight: bold;
+            color: #6b7280;
+            border: 1px solid #d1d5db;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 36px;
+            left: 4px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        input:checked + .slider {
+            background-color: #e5e7eb;
+        }
+        input:checked + .slider:before {
+            transform: translateX(36px);
+        }
+        .lang-text-en, .lang-text-th {
+            z-index: 1;
+            transition: color .4s;
+        }
+        input:not(:checked) + .slider .lang-text-en {
+            color: #3b82f6; /* สีน้ำเงินสำหรับโหมด EN */
+        }
+        input:checked + .slider .lang-text-th {
+            color: #ea580c; /* สีส้มสำหรับโหมด TH */
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- ส่วนหัวของเว็บไซต์ (Header) -->
+    <header class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white py-6 px-4 shadow-lg relative">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <div class="text-center md:text-left">
+                <h1 class="text-3xl md:text-4xl font-bold mb-2" data-i18n="title">Vector Dot Product</h1>
+                <p class="text-lg text-blue-100" data-i18n="subtitle">
+                    Interactive 2D & 3D visualization and calculation
+                </p>
+            </div>
+            <!-- ปุ่มสลับภาษา -->
+            <label class="lang-switch">
+                <input type="checkbox" id="lang-toggle">
+                <span class="slider">
+                    <span class="lang-text-en">EN</span>
+                    <span class="lang-text-th">TH</span>
+                </span>
+            </label>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto p-4 space-y-8 mt-4">
+
+        <!-- เนื้อหาทฤษฎีและประวัติ (History & Theory Section) -->
+        <section class="grid md:grid-cols-2 gap-6">
+            <!-- บล็อกประวัติการค้นพบ -->
+            <div class="bg-white p-6 rounded-2xl shadow-md border-t-4 border-yellow-400">
+                <h2 class="text-2xl font-bold mb-3 text-gray-800 flex items-center">
+                    <svg class="w-6 h-6 mr-2 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                    <span data-i18n="history_title">History</span>
+                </h2>
+                <p class="text-gray-600 leading-relaxed indent-8" data-i18n="history_content">
+                    The dot product, or scalar product, was defined in the late 1880s by <strong>Josiah Willard Gibbs</strong> and <strong>Oliver Heaviside</strong>. They independently developed vector analysis to replace the complex quaternion system. Gibbs introduced the dot (\(\cdot\)) symbol to denote the product that results in a <strong>scalar (number)</strong>, representing the directional alignment of the two vectors.
+                </p>
+            </div>
+            
+            <!-- บล็อกนิยามและสูตร -->
+            <div class="bg-white p-6 rounded-2xl shadow-md border-t-4 border-blue-500">
+                <h2 class="text-2xl font-bold mb-3 text-gray-800 flex items-center">
+                    <svg class="w-6 h-6 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                    <span data-i18n="theory_title">Definition & Formulas</span>
+                </h2>
+                <div class="text-gray-700 space-y-4">
+                    <p data-i18n="theory_content">The dot product of vectors \(\vec{A}\) and \(\vec{B}\) is the sum of the products of their corresponding components. The result is a <strong>scalar (a single number)</strong>.</p>
+                    <div class="bg-gray-50 p-4 rounded-lg text-center overflow-x-auto">
+                        <p class="text-lg"><span data-i18n="algebraic_formula">Algebraic Formula</span>: \(\vec{A} \cdot \vec{B} = A_x B_x + A_y B_y + A_z B_z\)</p>
+                        <p class="text-lg mt-2"><span data-i18n="geometric_formula">Geometric Formula</span>: \(\vec{A} \cdot \vec{B} = |\vec{A}| |\vec{B}| \cos(\theta)\)</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ส่วนของเครื่องมือ 2D (2D Interactive Section) -->
+        <section class="bg-white p-6 md:p-8 rounded-3xl shadow-lg border border-gray-100">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b-2 border-red-400 pb-2 inline-block" data-i18n="section_2d_title">1. 2D Dot Product</h2>
+            
+            <div class="flex flex-col space-y-6">
+                
+                <!-- แถวบน: พื้นที่วาดรูป Canvas 2D และ ช่องกรอกข้อมูลเวกเตอร์ -->
+                <div class="grid lg:grid-cols-2 gap-8 items-center">
+                    
+                    <!-- พื้นที่กราฟ 2D (ลดขนาดพื้นที่รูปให้เหมาะสม) -->
+                    <div class="relative flex justify-center bg-gray-50 rounded-xl overflow-hidden border border-gray-200 shadow-inner p-2 w-full max-w-[450px] mx-auto">
+                        <canvas id="canvas2d" width="450" height="400" class="max-w-full h-auto rounded-lg"></canvas>
+                    </div>
+
+                    <!-- พื้นที่ควบคุมเวกเตอร์ (ช่องกรอกตัวเลขแบบเมทริกซ์) -->
+                    <div class="flex flex-col justify-center space-y-6">
+                        <div class="grid grid-cols-2 gap-4">
+                            <!-- Vector A Input -->
+                            <div class="bg-red-50 p-4 rounded-xl border border-red-100 flex flex-col items-center shadow-sm">
+                                <h3 class="font-bold text-red-700 mb-3" data-i18n="vector_a">Vector A</h3>
+                                <div class="flex items-center text-lg">
+                                    <span class="mr-2 font-bold text-red-700">\(\vec{A} = \)</span>
+                                    <div class="flex flex-col border-l-2 border-r-2 border-red-700 px-2 py-1 space-y-2 rounded-[4px] bg-white">
+                                        <input type="number" id="ax2" value="3" class="w-16 text-center border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-red-400 font-mono text-gray-800 shadow-inner">
+                                        <input type="number" id="ay2" value="4" class="w-16 text-center border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-red-400 font-mono text-gray-800 shadow-inner">
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Vector B Input -->
+                            <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col items-center shadow-sm">
+                                <h3 class="font-bold text-blue-700 mb-3" data-i18n="vector_b">Vector B</h3>
+                                <div class="flex items-center text-lg">
+                                    <span class="mr-2 font-bold text-blue-700">\(\vec{B} = \)</span>
+                                    <div class="flex flex-col border-l-2 border-r-2 border-blue-700 px-2 py-1 space-y-2 rounded-[4px] bg-white">
+                                        <input type="number" id="bx2" value="5" class="w-16 text-center border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 font-mono text-gray-800 shadow-inner">
+                                        <input type="number" id="by2" value="0" class="w-16 text-center border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 font-mono text-gray-800 shadow-inner">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 border border-gray-200 text-gray-500 text-sm p-4 rounded-xl text-center shadow-sm" data-i18n="input_hint">
+                            * Edit the numbers in the matrix brackets above to change the vectors. The visualization and calculation below will update automatically.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- แถวล่าง: การคำนวณอย่างละเอียด (แสดงเต็มความกว้างขอบเขตจอ ไม่ต้องมี Scrollbar ล่าง) -->
+                <div class="w-full bg-gray-800 text-white p-6 md:p-8 rounded-2xl shadow-xl border border-gray-700">
+                    <h3 class="text-xl font-bold text-gray-100 mb-4 border-b border-gray-600 pb-2 flex items-center">
+                        <svg class="w-6 h-6 mr-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <span data-i18n="calculation_title">Detailed Calculation</span>
+                    </h3>
+                    <div class="math-text text-lg space-y-4 mt-4 w-full flex flex-col items-center md:items-start" id="calc2d">
+                        <!-- โค้ด MathJax จะถูกนำมาใส่ที่นี่อัตโนมัติด้วย JavaScript -->
+                    </div>
+                </div>
+                
+            </div>
+        </section>
+
+        <!-- ส่วนของเครื่องมือ 3D (3D Interactive Section) -->
+        <section class="bg-white p-6 md:p-8 rounded-3xl shadow-lg border border-gray-100">
+            <h2 class="text-3xl font-bold mb-2 text-gray-800 border-b-2 border-green-500 pb-2 inline-block" data-i18n="section_3d_title">2. 3D Dot Product</h2>
+            <p class="text-sm text-gray-500 mb-6" data-i18n="3d_instructions">* Click and drag to rotate, scroll to zoom, right-click to pan.</p>
+
+            <div class="flex flex-col space-y-6">
+                
+                <!-- แถวบน: พื้นที่วาดรูป 3D (Three.js) และ ช่องกรอกข้อมูลเวกเตอร์ -->
+                <div class="grid lg:grid-cols-2 gap-8 items-center">
+                    
+                    <!-- พื้นที่กราฟ 3D -->
+                    <div id="container3d" class="relative bg-gray-900 rounded-xl overflow-hidden shadow-inner h-[350px] md:h-[400px] w-full max-w-[450px] mx-auto flex justify-center items-center cursor-move border border-gray-800">
+                        <!-- Canvas ของ ThreeJS จะถูกวาดลงใน div นี้ -->
+                    </div>
+
+                    <!-- พื้นที่ควบคุมเวกเตอร์ (ช่องกรอกตัวเลขแบบเมทริกซ์ 3 มิติ) -->
+                    <div class="flex flex-col justify-center space-y-6">
+                        <div class="grid grid-cols-2 gap-4">
+                            <!-- Vector A Input -->
+                            <div class="bg-red-50 p-4 rounded-xl border border-red-100 flex flex-col items-center shadow-sm">
+                                <h3 class="font-bold text-red-700 mb-3" data-i18n="vector_a">Vector A</h3>
+                                <div class="flex items-center text-lg">
+                                    <span class="mr-2 font-bold text-red-700">\(\vec{A} = \)</span>
+                                    <div class="flex flex-col border-l-2 border-r-2 border-red-700 px-2 py-1 space-y-2 rounded-[4px] bg-white">
+                                        <input type="number" id="ax3" value="3" class="w-16 text-center border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-red-400 font-mono text-gray-800 shadow-inner">
+                                        <input type="number" id="ay3" value="4" class="w-16 text-center border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-red-400 font-mono text-gray-800 shadow-inner">
+                                        <input type="number" id="az3" value="2" class="w-16 text-center border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-red-400 font-mono text-gray-800 shadow-inner">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Vector B Input -->
+                            <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col items-center shadow-sm">
+                                <h3 class="font-bold text-blue-700 mb-3" data-i18n="vector_b">Vector B</h3>
+                                <div class="flex items-center text-lg">
+                                    <span class="mr-2 font-bold text-blue-700">\(\vec{B} = \)</span>
+                                    <div class="flex flex-col border-l-2 border-r-2 border-blue-700 px-2 py-1 space-y-2 rounded-[4px] bg-white">
+                                        <input type="number" id="bx3" value="-2" class="w-16 text-center border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 font-mono text-gray-800 shadow-inner">
+                                        <input type="number" id="by3" value="3" class="w-16 text-center border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 font-mono text-gray-800 shadow-inner">
+                                        <input type="number" id="bz3" value="5" class="w-16 text-center border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 font-mono text-gray-800 shadow-inner">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 border border-gray-200 text-gray-500 text-sm p-4 rounded-xl text-center shadow-sm" data-i18n="input_hint">
+                            * Edit the numbers in the matrix brackets above to change the vectors. The visualization and calculation below will update automatically.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- แถวล่าง: การคำนวณ 3 มิติอย่างละเอียด (แสดงเต็มพื้นที่ให้สมการอ่านง่าย) -->
+                <div class="w-full bg-gray-800 text-white p-6 md:p-8 rounded-2xl shadow-xl border border-gray-700">
+                    <h3 class="text-xl font-bold text-gray-200 mb-4 border-b border-gray-600 pb-2 flex items-center">
+                        <svg class="w-6 h-6 mr-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <span data-i18n="calculation_title">Detailed Calculation</span>
+                    </h3>
+                    <div class="math-text text-lg space-y-4 mt-4 w-full flex flex-col items-center md:items-start" id="calc3d">
+                        <!-- โค้ด MathJax จะถูกนำมาใส่ที่นี่อัตโนมัติด้วย JavaScript -->
+                    </div>
+                </div>
+                
+            </div>
+        </section>
+    </main>
+
+    <!-- ส่วนท้ายของเว็บไซต์ (Footer) -->
+    <footer class="bg-gray-900 text-gray-400 py-6 text-center mt-8 border-t border-gray-800">
+        <div class="max-w-4xl mx-auto px-4">
+            <p class="mb-2" data-i18n="footer_note">This educational resource is for learning purposes.</p>
+            <p class="text-white font-medium">Supported by <a href="https://opensimlab.org" target="_blank" class="text-blue-400 hover:text-blue-300 underline transition">OpenSimLab.org</a></p>
+            <p class="text-sm mt-2 text-gray-500">Code Generated by: <strong>Gemini</strong></p>
+        </div>
+    </footer>
+
+    <!-- ===================================================================== -->
+    <!-- ลอจิกการทำงานของแอปพลิเคชัน (JavaScript Application Logic)              -->
+    <!-- ===================================================================== -->
+    <script>
+        
+        // === 1. ระบบแปลภาษา (Language Localization) ===
+        // ดิกชันนารีเก็บคำแปลภาษาไทยและอังกฤษ เพื่อให้เว็บรองรับสองภาษา
+        const i18n = {
+            en: {
+                title: "Vector Dot Product",
+                subtitle: "Interactive 2D & 3D visualization and calculation",
+                history_title: "History",
+                history_content: "The dot product, or scalar product, was defined in the late 1880s by <strong>Josiah Willard Gibbs</strong> and <strong>Oliver Heaviside</strong>. They independently developed vector analysis to replace the complex quaternion system. Gibbs introduced the dot (\\(\\cdot\\)) symbol to denote the product that results in a <strong>scalar (number)</strong>, representing the directional alignment of the two vectors.",
+                theory_title: "Definition & Formulas",
+                theory_content: "The dot product of vectors \\(\\vec{A}\\) and \\(\\vec{B}\\) is the sum of the products of their corresponding components. The result is a <strong>scalar (a single number)</strong>.",
+                algebraic_formula: "Algebraic Formula",
+                geometric_formula: "Geometric Formula",
+                section_2d_title: "1. 2D Dot Product",
+                vector_a: "Vector A",
+                vector_b: "Vector B",
+                input_hint: "* Edit the numbers in the matrix brackets above to change the vectors. The visualization and calculation below will update automatically.",
+                calculation_title: "Detailed Calculation (Step-by-step)",
+                section_3d_title: "2. 3D Dot Product",
+                "3d_instructions": "* Click and drag to rotate, scroll to zoom, right-click to pan.",
+                footer_note: "This educational resource is for learning purposes.",
+                angle_calc_title: "Angle Calculation (\\(\\theta\\))",
+                given: "Given",
+                formula: "Formula",
+                substitute: "Substitute",
+                calculate: "Calculate",
+                result: "Result (Scalar)",
+                magnitude_a: "Magnitude",
+                magnitude_b: "Magnitude",
+                cos_theta: "Cosine",
+                theta_rad: "Angle (radians)",
+                theta_deg: "Angle (degrees)",
+            },
+            th: {
+                title: "การคูณเวกเตอร์แบบดอต (Dot Product)",
+                subtitle: "เรียนรู้และทำความเข้าใจผลคูณเชิงสเกลาร์ผ่านการจำลองภาพแบบอินเทอร์แอกทีฟ 2 มิติ และ 3 มิติ",
+                history_title: "ประวัติการค้นพบ",
+                history_content: "การคูณแบบดอต หรือผลคูณเชิงสเกลาร์ (Scalar Product) ถูกนิยามขึ้นในช่วงปลายทศวรรษที่ 1880 โดย <strong>โจไซอาห์ วิลลาร์ด กิบส์ (Josiah Willard Gibbs)</strong> และ <strong>โอลิเวอร์ เฮฟวีไซด์ (Oliver Heaviside)</strong> ทั้งสองได้พัฒนาพีชคณิตเวกเตอร์ขึ้นเพื่อทดแทนระบบ \"ควอเทอร์เนียน\" ที่ซับซ้อน กิบส์เป็นผู้ริเริ่มการใช้สัญลักษณ์จุด (\\(\\cdot\\)) เพื่อแสดงถึงผลคูณที่ได้ออกมาเป็น \"ตัวเลข (สเกลาร์)\" ซึ่งแสดงถึงความสอดคล้องกันของทิศทางเวกเตอร์ทั้งสอง",
+                theory_title: "นิยามและสมการพื้นฐาน",
+                theory_content: "ผลคูณดอตของเวกเตอร์ \\(\\vec{A}\\) และ \\(\\vec{B}\\) คือผลรวมของการคูณส่วนประกอบในแต่ละแกนเข้าด้วยกัน ผลลัพธ์ที่ได้จะเป็น <strong>สเกลาร์ (ตัวเลข)</strong>",
+                algebraic_formula: "สูตรพีชคณิต",
+                geometric_formula: "สูตรเรขาคณิต",
+                section_2d_title: "1. การคูณแบบดอตใน 2 มิติ (2D)",
+                vector_a: "เวกเตอร์ A",
+                vector_b: "เวกเตอร์ B",
+                input_hint: "* เปลี่ยนแปลงตัวเลขในช่องวงเล็บเมทริกซ์ด้านบนเพื่อแก้ไขเวกเตอร์ รูปภาพและการคำนวณด้านล่างจะอัปเดตตามทันที",
+                calculation_title: "วิธีทำอย่างละเอียด (Step-by-step)",
+                section_3d_title: "2. การคูณแบบดอตใน 3 มิติ (3D)",
+                "3d_instructions": "* สามารถใช้เมาส์คลิกค้างแล้วลากเพื่อหมุนกล้องดูแกน 3 มิติได้ (หมุน, ซูม, เลื่อน)",
+                footer_note: "สื่อการเรียนรู้นี้จัดทำขึ้นเพื่อการศึกษา",
+                angle_calc_title: "การคำนวณมุม (\\(\\theta\\))",
+                given: "กำหนดให้",
+                formula: "สูตร",
+                substitute: "แทนค่า",
+                calculate: "คำนวณ",
+                result: "ผลลัพธ์ (สเกลาร์)",
+                magnitude_a: "ขนาดของ",
+                magnitude_b: "ขนาดของ",
+                cos_theta: "โคไซน์",
+                theta_rad: "มุม (เรเดียน)",
+                theta_deg: "มุม (องศา)",
+            }
+        };
+
+        let currentLang = 'en';
+        const langToggle = document.getElementById('lang-toggle');
+
+        // ฟังก์ชันอัปเดตข้อความบนหน้าเว็บตามภาษาที่เลือก
+        function updateLanguage() {
+            currentLang = langToggle.checked ? 'th' : 'en';
+            document.documentElement.lang = currentLang;
+            
+            // แทนที่เนื้อหา HTML สำหรับองค์ประกอบที่มีแอตทริบิวต์ data-i18n
+            document.querySelectorAll('[data-i18n]').forEach(element => {
+                const key = element.getAttribute('data-i18n');
+                if (i18n[currentLang][key]) {
+                    element.innerHTML = i18n[currentLang][key];
+                }
+            });
+
+            // อัปเดตสมการ MathJax ใหม่ หากเปลี่ยนภาษา (เพื่อจัดฟอร์แมตใหม่)
+            if (window.MathJax) {
+                MathJax.typesetPromise().catch((err) => console.log('MathJax error: ', err));
+            }
+            
+            update2D();
+            update3D();
+        }
+
+        langToggle.addEventListener('change', updateLanguage);
+
+        // === 2. ฟังก์ชันช่วยคำนวณคณิตศาสตร์ทั่วไป ===
+        
+        // แปลงมุมเรเดียน เป็น องศา
+        function toDegrees(radians) {
+            return radians * (180 / Math.PI);
+        }
+
+        // จัดรูปแบบตัวเลข (ถ้าเป็นจำนวนเต็มไม่แสดงจุดทศนิยม, ถ้ามีทศนิยมให้แสดง 2 ตำแหน่ง)
+        function formatNumber(num) {
+            return Number.isInteger(num) ? num.toString() : num.toFixed(2);
+        }
+
+        // ฟังก์ชันสำคัญ: รับข้อความสมการ LaTeX เข้ามา แล้วสั่งให้ MathJax วาดเป็นสมการคณิตศาสตร์
+        function renderMathJax(elementId, mathString) {
+            const el = document.getElementById(elementId);
+            el.innerHTML = mathString;
+            // ใช้ typesetPromise แบบ Async เพื่อหลีกเลี่ยงการล็อกการทำงานของบราวเซอร์
+            if (window.MathJax) {
+                MathJax.typesetPromise([el]).catch((err) => console.log('MathJax error: ', err));
+            }
+        }
+
+
+        // === 3. ส่วนการทำงานของกราฟ 2 มิติ (2D Canvas Logic) ===
+        const canvas2d = document.getElementById('canvas2d');
+        const ctx = canvas2d.getContext('2d');
+        const width = canvas2d.width;
+        const height = canvas2d.height;
+        const scale = 20; // 1 สเกลเวกเตอร์ เท่ากับ 20 พิกเซล
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        // อ้างอิงถึงช่องกรอกตัวเลข HTML (DOM Elements)
+        const inputs2d = {
+            ax: document.getElementById('ax2'),
+            ay: document.getElementById('ay2'),
+            bx: document.getElementById('bx2'),
+            by: document.getElementById('by2')
+        };
+        const calc2dDiv = document.getElementById('calc2d');
+
+        // ฟังก์ชันวาดเส้นตาราง (Grid) และแกน X, Y
+        function drawGrid() {
+            ctx.clearRect(0, 0, width, height); // เคลียร์หน้าจอ
+            ctx.strokeStyle = '#e5e7eb'; // สีเส้นตาราง (เทาอ่อน)
+            ctx.lineWidth = 1;
+            
+            // วาดเส้นตาราง (Grid lines)
+            for(let i = centerX; i <= width; i += scale) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, height); ctx.stroke(); }
+            for(let i = centerX; i >= 0; i -= scale) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, height); ctx.stroke(); }
+            for(let i = centerY; i <= height; i += scale) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(width, i); ctx.stroke(); }
+            for(let i = centerY; i >= 0; i -= scale) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(width, i); ctx.stroke(); }
+
+            // วาดแกน X และ Y เส้นหนา
+            ctx.strokeStyle = '#6b7280'; // สีเทาเข้ม
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(centerX, 0); ctx.lineTo(centerX, height); ctx.stroke(); // Y-axis
+            ctx.beginPath(); ctx.moveTo(0, centerY); ctx.lineTo(width, centerY); ctx.stroke(); // X-axis
+            
+            // เพิ่มป้ายกำกับแกน
+            ctx.fillStyle = '#374151'; // สีข้อความกำกับ
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText('+X', width - 25, centerY + 20);
+            ctx.fillText('-X', 5, centerY + 20);
+            ctx.fillText('+Y', centerX + 10, 20);
+            ctx.fillText('-Y', centerX + 10, height - 5);
+            ctx.fillText('O', centerX - 15, centerY + 20); // จุดกำเนิด (Origin)
+        }
+
+        // ฟังก์ชันวาดลูกศรเวกเตอร์
+        function drawArrow(toX, toY, color, label) {
+            if (toX === 0 && toY === 0) return; // ไม่วาดเวกเตอร์ 0
+            
+            // แปลงพิกัดโลกคณิตศาสตร์ เป็นพิกัดหน้าจอ Canvas (แกน Y บนจอจะกลับหัว)
+            const screenX = centerX + toX * scale;
+            const screenY = centerY - toY * scale; 
+            
+            // วาดตัวเส้นลูกศร
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(screenX, screenY);
+            ctx.stroke();
+
+            // คำนวณและวาดหัวลูกศร
+            const angle = Math.atan2(-toY, toX);
+            const headlen = 10;
+            ctx.beginPath();
+            ctx.moveTo(screenX, screenY);
+            ctx.lineTo(screenX - headlen * Math.cos(angle - Math.PI / 6), screenY - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(screenX - headlen * Math.cos(angle + Math.PI / 6), screenY - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.fill();
+
+            // ข้อความชื่อเวกเตอร์ A หรือ B
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText(label, screenX + 10, screenY - 10);
+        }
+
+        // ฟังก์ชันวาดเส้นโค้งแสดงมุม (Theta Arc) ใน 2 มิติ
+        function drawAngleArc(ax, ay, bx, by, angleRad) {
+            if (angleRad <= 0.01 || isNaN(angleRad)) return; // ไม่วาดถ้ามุมแคบเกินไป
+            
+            const radius = 50; // รัศมีของเส้นโค้ง
+            const startAngle = Math.atan2(-ay, ax); // แกน Y ของ Canvas สลับทิศ จึงต้องติดลบ
+            const endAngle = Math.atan2(-by, bx);
+            
+            ctx.strokeStyle = '#10b981'; // สีเขียว Emerald
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            // วาดส่วนโค้ง (arc)
+            ctx.arc(centerX, centerY, radius, startAngle, endAngle, endAngle < startAngle);
+            ctx.stroke();
+            
+            // วาดสัญลักษณ์ θ กำกับกึ่งกลางเส้นโค้ง
+            const midAngle = startAngle + (endAngle - startAngle) / 2;
+            const labelX = centerX + (radius + 20) * Math.cos(midAngle);
+            const labelY = centerY + (radius + 20) * Math.sin(midAngle);
+            ctx.fillStyle = '#10b981';
+            ctx.font = 'bold 16px Times New Roman';
+            ctx.fillText('θ', labelX, labelY);
+            ctx.font = '12px Arial';
+            ctx.fillText(`${toDegrees(angleRad).toFixed(1)}°`, labelX + 15, labelY);
+        }
+
+        // ฟังก์ชันอัปเดตสถานะทั้งหมดของ 2D เมื่อผู้ใช้พิมพ์ตัวเลขเปลี่ยน
+        function update2D() {
+            const ax = parseFloat(inputs2d.ax.value) || 0;
+            const ay = parseFloat(inputs2d.ay.value) || 0;
+            const bx = parseFloat(inputs2d.bx.value) || 0;
+            const by = parseFloat(inputs2d.by.value) || 0;
+
+            // คำนวณ Dot Product 
+            const p1 = ax * bx;
+            const p2 = ay * by;
+            const dot = p1 + p2;
+            
+            // คำนวณขนาด (Magnitude) เพื่อหามุม
+            const magASq = ax*ax + ay*ay;
+            const magBSq = bx*bx + by*by;
+            const magA = Math.sqrt(magASq);
+            const magB = Math.sqrt(magBSq);
+            
+            // คำนวณหามุมระหว่างเวกเตอร์ (Theta)
+            let angleRad = 0;
+            let cosTheta = 0;
+            if(magA > 0 && magB > 0) {
+                cosTheta = dot / (magA * magB);
+                cosTheta = Math.max(-1, Math.min(1, cosTheta)); // ป้องกันค่าหลุดช่วง -1 ถึง 1 เนื่องจาก precision error ของทศนิยม
+                angleRad = Math.acos(cosTheta);
+            }
+
+            // เรียกใช้วาดกราฟทั้งหมด
+            drawGrid();
+            drawArrow(ax, ay, '#ef4444', 'A'); // วาดเวกเตอร์ A (สีแดง)
+            drawArrow(bx, by, '#3b82f6', 'B'); // วาดเวกเตอร์ B (สีน้ำเงิน)
+            drawAngleArc(ax, ay, bx, by, angleRad);
+
+            // อัปเดตการแสดงผลสมการ (MathJax LaTeX String) แบบละเอียด 2 มิติ
+            // ใช้ \\ เพื่อ escape string สำหรับ Javascript และได้ \ เพื่อส่งให้ MathJax
+            const lang = i18n[currentLang];
+            let tex2d = `
+                <div class="w-full">
+                \\[ \\begin{aligned}
+                \\text{${lang.given}}: &\\quad \\vec{A} = \\begin{bmatrix} ${ax} \\\\\\\\ ${ay} \\end{bmatrix}, \\quad \\vec{B} = \\begin{bmatrix} ${bx} \\\\\\\\ ${by} \\end{bmatrix} \\\\\\\\
+                \\text{${lang.formula}}: &\\quad \\vec{A} \\cdot \\vec{B} = A_x B_x + A_y B_y \\\\\\\\
+                \\text{${lang.substitute}}: &\\quad \\vec{A} \\cdot \\vec{B} = (${ax})(${bx}) + (${ay})(${by}) \\\\\\\\
+                \\text{${lang.calculate}}: &\\quad \\vec{A} \\cdot \\vec{B} = ${p1} + ${p2} \\\\\\\\
+                \\text{${lang.result}}: &\\quad \\vec{A} \\cdot \\vec{B} = \\mathbf{${dot}}
+                \\end{aligned} \\]
+                </div>
+                <div class="w-full mt-6 pt-4 border-t border-gray-600">
+                    <p class="font-bold text-green-400 mb-2 text-center md:text-left">${lang.angle_calc_title}</p>
+            `;
+
+            if (magA > 0 && magB > 0) {
+                tex2d += `
+                \\[ \\begin{aligned}
+                \\text{${lang.magnitude_a}} (\\vec{A}): &\\quad |\\vec{A}| = \\sqrt{${ax}^2 + ${ay}^2} = \\sqrt{${magASq}} \\approx ${formatNumber(magA)} \\\\\\\\
+                \\text{${lang.magnitude_b}} (\\vec{B}): &\\quad |\\vec{B}| = \\sqrt{${bx}^2 + ${by}^2} = \\sqrt{${magBSq}} \\approx ${formatNumber(magB)} \\\\\\\\
+                \\text{${lang.cos_theta}} (\\cos\\theta): &\\quad \\cos(\\theta) = \\frac{\\vec{A} \\cdot \\vec{B}}{|\\vec{A}| |\\vec{B}|} = \\frac{${dot}}{(${formatNumber(magA)})(${formatNumber(magB)})} \\approx ${formatNumber(cosTheta)} \\\\\\\\
+                \\text{${lang.theta_rad}}: &\\quad \\theta = \\arccos(${formatNumber(cosTheta)}) \\approx \\mathbf{${formatNumber(angleRad)} \\text{ rad}} \\\\\\\\
+                \\text{${lang.theta_deg}}: &\\quad \\theta \\approx \\mathbf{${toDegrees(angleRad).toFixed(1)}^{\\circ}}
+                \\end{aligned} \\]
+                </div>`;
+            } else {
+                tex2d += `<p class="text-red-300 mt-2 text-center md:text-left">Cannot calculate angle: One or both vectors have zero magnitude.</p></div>`;
+            }
+
+            renderMathJax('calc2d', tex2d);
+        }
+
+        // ผูกฟังก์ชัน update2D ให้ทำงานเมื่อผู้ใช้พิมพ์แก้ไขตัวเลขใดๆ
+        Object.values(inputs2d).forEach(input => input.addEventListener('input', update2D));
+        
+
+        // === 4. ส่วนการทำงานของพื้นที่ 3 มิติ (3D Three.js Logic) ===
+        const container3d = document.getElementById('container3d');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x111827); // สีพื้นหลัง (tailwind gray-900)
+
+        // ตั้งค่ากล้อง 3D Perspective
+        const camera = new THREE.PerspectiveCamera(45, container3d.clientWidth / container3d.clientHeight, 0.1, 1000);
+        camera.position.set(15, 15, 20);
+
+        // ตัวเรนเดอร์กราฟิก
+        const renderer = new THREE.WebGLRenderer({ antialias: true }); // antialias ทำให้ขอบวัตถุเรียบเนียน
+        renderer.setSize(container3d.clientWidth, container3d.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container3d.appendChild(renderer.domElement);
+
+        // ระบบควบคุมกล้อง (OrbitControls) ให้หมุนเมาส์ ซูม ได้
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // พื้นตารางกริด (Grid) 
+        const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
+        scene.add(gridHelper);
+        
+        // ฟังก์ชันสร้างป้ายกำกับแกน 3 มิติ แบบ Sprite
+        function createAxisLabel(text, position, color) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.font = 'bold 36px Arial';
+            ctx.fillStyle = color;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 64, 32);
+            
+            // นำภาพที่สร้างด้วย 2D มาเป็น Texture แปะบน Sprite
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(material);
+            sprite.position.copy(position);
+            sprite.scale.set(4, 2, 2);
+            return sprite;
+        }
+
+        // สร้างเส้นแกน XYZ
+        const axesLength = 12;
+        const axesHelper = new THREE.AxesHelper(axesLength);
+        // แทนที่สีเริ่มต้นแกนด้วยสีที่กำหนดเอง แดง(X) เขียว(Y) น้ำเงิน(Z)
+        axesHelper.geometry.setAttribute('color', new THREE.Float32BufferAttribute([
+            1, 0, 0, 1, 0, 0, // X (Red)
+            0, 1, 0, 0, 1, 0, // Y (Green)
+            0, 0, 1, 0, 0, 1  // Z (Blue)
+        ], 3));
+        scene.add(axesHelper);
+
+        // แปะป้ายแกน
+        scene.add(createAxisLabel('X', new THREE.Vector3(axesLength + 1, 0, 0), '#ff0000'));
+        scene.add(createAxisLabel('Y', new THREE.Vector3(0, axesLength + 1, 0), '#00ff00'));
+        scene.add(createAxisLabel('Z', new THREE.Vector3(0, 0, axesLength + 1), '#0088ff'));
+
+        // สร้างตัวแปรลูกศรเวกเตอร์ 3D A และ B (จะอัปเดตทิศทางและความยาวทีหลัง)
+        const origin = new THREE.Vector3(0, 0, 0);
+        const arrowA = new THREE.ArrowHelper(new THREE.Vector3(1,0,0), origin, 1, 0xef4444, 1, 0.5); // สีแดง
+        const arrowB = new THREE.ArrowHelper(new THREE.Vector3(0,1,0), origin, 1, 0x3b82f6, 1, 0.5); // สีน้ำเงิน
+        scene.add(arrowA);
+        scene.add(arrowB);
+
+        // ตัวแปรสำหรับวาดเส้นโค้งมุมใน 3 มิติ
+        let angleArcMesh;
+        let angleLabelSprite;
+
+        // อ้างอิง DOM Elements สำหรับรับค่าเวกเตอร์ 3D
+        const inputs3d = {
+            ax: document.getElementById('ax3'), ay: document.getElementById('ay3'), az: document.getElementById('az3'),
+            bx: document.getElementById('bx3'), by: document.getElementById('by3'), bz: document.getElementById('bz3')
+        };
+        const calc3dDiv = document.getElementById('calc3d');
+
+        // ฟังก์ชันหลัก สำหรับการอัปเดตเมื่อตัวเลขในกล่อง 3D เปลี่ยนแปลง
+        function update3D() {
+            const ax = parseFloat(inputs3d.ax.value) || 0;
+            const ay = parseFloat(inputs3d.ay.value) || 0;
+            const az = parseFloat(inputs3d.az.value) || 0;
+            const bx = parseFloat(inputs3d.bx.value) || 0;
+            const by = parseFloat(inputs3d.by.value) || 0;
+            const bz = parseFloat(inputs3d.bz.value) || 0;
+
+            const vecA = new THREE.Vector3(ax, ay, az);
+            const vecB = new THREE.Vector3(bx, by, bz);
+
+            // อัปเดตทิศทางและขนาดของเวกเตอร์ลูกศรในโลก 3 มิติ
+            if(vecA.length() > 0) {
+                arrowA.setDirection(vecA.clone().normalize());
+                arrowA.setLength(vecA.length(), 1, 0.5);
+            } else { arrowA.setLength(0); } // ซ่อนถ้าเวกเตอร์เป็น 0
+            
+            if(vecB.length() > 0) {
+                arrowB.setDirection(vecB.clone().normalize());
+                arrowB.setLength(vecB.length(), 1, 0.5);
+            } else { arrowB.setLength(0); }
+
+            // ส่วนคำนวณคณิตศาสตร์
+            const p1 = ax * bx; const p2 = ay * by; const p3 = az * bz;
+            const dot = p1 + p2 + p3;
+            const magASq = ax*ax + ay*ay + az*az;
+            const magBSq = bx*bx + by*by + bz*bz;
+            const magA = Math.sqrt(magASq);
+            const magB = Math.sqrt(magBSq);
+
+            let angleRad = 0;
+            let cosTheta = 0;
+            if(magA > 0 && magB > 0) {
+                cosTheta = dot / (magA * magB);
+                cosTheta = Math.max(-1, Math.min(1, cosTheta));
+                angleRad = Math.acos(cosTheta);
+            }
+
+            // ลบเส้นโค้งมุมและป้ายเก่าออก ก่อนวาดใหม่
+            if (angleArcMesh) scene.remove(angleArcMesh);
+            if (angleLabelSprite) scene.remove(angleLabelSprite);
+
+            // วาดเส้นโค้งแสดงมุม (Theta arc) บนระนาบ 3 มิติระหว่าง 2 เวกเตอร์
+            if (magA > 0 && magB > 0 && angleRad > 0.01) {
+                const radius = Math.min(magA, magB) * 0.4 || 2;
+                
+                // คำนวณหา Vector ที่ระนาบเดียวกันเพื่อใช้เป็นแนวอ้างอิงในการวาดส่วนโค้ง
+                const vA = vecA.clone().normalize();
+                let normal = new THREE.Vector3().crossVectors(vecA, vecB).normalize();
+                
+                // กรณีเวกเตอร์ทับกันพอดีหรือตั้งฉากกันมาก ทำให้ normal ใกล้เคียง 0
+                if (normal.lengthSq() < 0.0001) {
+                    normal.set(0, 0, 1);
+                    if (Math.abs(vecA.z) > 0.9) normal.set(0, 1, 0);
+                    normal.cross(vecA).normalize();
+                }
+                
+                // หาเวกเตอร์ตั้งฉากกับ A ในระนาบเดียวกัน เพื่อสร้างระบบพิกัดเฉพาะที่ (Local Coordinates)
+                const vB_ortho = new THREE.Vector3().crossVectors(normal, vA).normalize();
+                
+                // สร้างจุดต่อเส้นโค้งตามพิกัด Parametric (x = r*cos(t), y = r*sin(t))
+                const points = [];
+                const segments = 40;
+                for (let i = 0; i <= segments; i++) {
+                    const t = (i / segments) * angleRad;
+                    const pt = new THREE.Vector3()
+                        .addScaledVector(vA, radius * Math.cos(t))
+                        .addScaledVector(vB_ortho, radius * Math.sin(t));
+                    points.push(pt);
+                }
+                
+                // สร้างชิ้นส่วนและนำลงซีน 3 มิติ
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const material = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 2 }); // สีเขียวมรกต
+                angleArcMesh = new THREE.Line(geometry, material);
+                scene.add(angleArcMesh);
+
+                // สร้างป้ายข้อความสัญลักษณ์ θ ให้ลอยอยู่กึ่งกลางมุม
+                const midT = angleRad / 2;
+                const labelPos = new THREE.Vector3()
+                    .addScaledVector(vA, (radius + 1) * Math.cos(midT))
+                    .addScaledVector(vB_ortho, (radius + 1) * Math.sin(midT));
+                
+                angleLabelSprite = createAxisLabel(`θ ${toDegrees(angleRad).toFixed(0)}°`, labelPos, '#10b981');
+                scene.add(angleLabelSprite);
+            }
+
+            // อัปเดตแสดงผลสมการ (MathJax LaTeX String) สำหรับ 3 มิติ
+            const lang = i18n[currentLang];
+            let tex3d = `
+                <div class="w-full">
+                \\[ \\begin{aligned}
+                \\text{${lang.given}}: &\\quad \\vec{A} = \\begin{bmatrix} ${ax} \\\\\\\\ ${ay} \\\\\\\\ ${az} \\end{bmatrix}, \\quad \\vec{B} = \\begin{bmatrix} ${bx} \\\\\\\\ ${by} \\\\\\\\ ${bz} \\end{bmatrix} \\\\\\\\
+                \\text{${lang.formula}}: &\\quad \\vec{A} \\cdot \\vec{B} = A_x B_x + A_y B_y + A_z B_z \\\\\\\\
+                \\text{${lang.substitute}}: &\\quad \\vec{A} \\cdot \\vec{B} = (${ax})(${bx}) + (${ay})(${by}) + (${az})(${bz}) \\\\\\\\
+                \\text{${lang.calculate}}: &\\quad \\vec{A} \\cdot \\vec{B} = ${p1} + ${p2} + ${p3} \\\\\\\\
+                \\text{${lang.result}}: &\\quad \\vec{A} \\cdot \\vec{B} = \\mathbf{${dot}}
+                \\end{aligned} \\]
+                </div>
+                <div class="w-full mt-6 pt-4 border-t border-gray-600">
+                    <p class="font-bold text-green-400 mb-2 text-center md:text-left">${lang.angle_calc_title}</p>
+            `;
+
+            if (magA > 0 && magB > 0) {
+                tex3d += `
+                \\[ \\begin{aligned}
+                \\text{${lang.magnitude_a}} (\\vec{A}): &\\quad |\\vec{A}| = \\sqrt{${ax}^2 + ${ay}^2 + ${az}^2} = \\sqrt{${magASq}} \\approx ${formatNumber(magA)} \\\\\\\\
+                \\text{${lang.magnitude_b}} (\\vec{B}): &\\quad |\\vec{B}| = \\sqrt{${bx}^2 + ${by}^2 + ${bz}^2} = \\sqrt{${magBSq}} \\approx ${formatNumber(magB)} \\\\\\\\
+                \\text{${lang.cos_theta}} (\\cos\\theta): &\\quad \\cos(\\theta) = \\frac{\\vec{A} \\cdot \\vec{B}}{|\\vec{A}| |\\vec{B}|} = \\frac{${dot}}{(${formatNumber(magA)})(${formatNumber(magB)})} \\approx ${formatNumber(cosTheta)} \\\\\\\\
+                \\text{${lang.theta_rad}}: &\\quad \\theta = \\arccos(${formatNumber(cosTheta)}) \\approx \\mathbf{${formatNumber(angleRad)} \\text{ rad}} \\\\\\\\
+                \\text{${lang.theta_deg}}: &\\quad \\theta \\approx \\mathbf{${toDegrees(angleRad).toFixed(1)}^{\\circ}}
+                \\end{aligned} \\]
+                </div>`;
+            } else {
+                tex3d += `<p class="text-red-300 mt-2 text-center md:text-left">Cannot calculate angle: One or both vectors have zero magnitude.</p></div>`;
+            }
+
+            renderMathJax('calc3d', tex3d);
+        }
+
+        // ผูกฟังก์ชัน update3D เมื่อตัวเลขเปลี่ยน
+        Object.values(inputs3d).forEach(input => input.addEventListener('input', update3D));
+
+        // ลูปอนิเมชันสำหรับ 3D (Animation Loop) เพื่อให้ผู้ใช้หมุนกล้องได้ลื่นไหล
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update(); // ขยับเมาส์หมุนมุมกล้อง
+            renderer.render(scene, camera); // เรนเดอร์เฟรมใหม่ลง Canvas
+        }
+        animate();
+
+        // จัดการเมื่อหน้าต่างเบราว์เซอร์ถูกปรับขนาด (Resize) เพื่อไม่ให้ 3D เบี้ยว
+        window.addEventListener('resize', () => {
+            const width = container3d.clientWidth;
+            const height = container3d.clientHeight;
+            renderer.setSize(width, height);
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+        });
+
+        // === 5. เริ่มต้นการทำงาน (Initialization) ===
+        window.addEventListener('load', () => {
+            updateLanguage(); // ตั้งค่าภาษาเริ่มต้น
+            
+            // ตั้งเวลาถ่วงนิดหน่อย เพื่อรอให้ระบบฟอนต์และ MathJax พร้อมทำงานก่อนทำการเรนเดอร์ครั้งแรก
+            setTimeout(() => { 
+                update2D(); 
+                update3D(); 
+            }, 500);
+        });
+
+    </script>
+</body>
+</html>
